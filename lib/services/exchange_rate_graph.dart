@@ -24,11 +24,16 @@ class ExchangeRateGraph extends StatelessWidget {
                   .toList(),
               isCurved: true,
               barWidth: 3,
-              color: Colors.green,
+              color: const Color.fromARGB(255, 74, 184, 74),
               dotData: FlDotData(show: true),
               belowBarData: BarAreaData(
                 show: true,
-                color: Colors.green.withOpacity(0.2),
+                color: const Color.fromARGB(
+                  255,
+                  240,
+                  241,
+                  236,
+                ).withOpacity(0.2),
               ),
             ),
           ],
