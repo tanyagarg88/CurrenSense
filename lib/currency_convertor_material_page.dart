@@ -1,8 +1,9 @@
-import 'package:currency_convertor/services/exchange_rate_graph.dart';
 import 'package:flutter/material.dart';
 import '../services/currency_api_service.dart';
-import '../widgets/exchange_rate_graph.dart';
 import '../screens/all_currencies_page.dart';
+import '../screens/currency_trends_page.dart';
+import '../learning/learning_mode_controller.dart';
+import '../theme/app_gradient.dart';
 
 class CurrencyConvertorMaterialPage extends StatefulWidget {
   const CurrencyConvertorMaterialPage({super.key});
@@ -16,16 +17,11 @@ class _CurrencyConvertorMaterialPageState
     extends State<CurrencyConvertorMaterialPage> {
   double result = 0.0;
   double currentRate = 0.0;
-
   bool isLoading = false;
-  bool showTrendCard = false;
-  bool isGraphLoading = false;
 
   String fromCurrency = 'USD';
   String toCurrency = 'INR';
   bool isSwapped = false;
-
-  List<double> historicalRates = [];
 
   final TextEditingController textEditingController = TextEditingController();
   Future<void> convertCurrency() async {
@@ -41,7 +37,7 @@ class _CurrencyConvertorMaterialPageState
     setState(() => isLoading = true);
 
     try {
-      final rate = await CurrencyApiService.getRate(fromCurrency);
+      final rate = await CurrencyApiService.getRate(fromCurrency, toCurrency);
 
       setState(() {
         currentRate = rate;
@@ -98,15 +94,6 @@ class _CurrencyConvertorMaterialPageState
     );
   }
 
-  Future<void> loadHistoricalData() async {
-    setState(() => isGraphLoading = true);
-    try {
-      final data = await CurrencyApiService.getHistoricalRates(fromCurrency);
-      setState(() => historicalRates = data);
-    } catch (_) {}
-    setState(() => isGraphLoading = false);
-  }
-
   @override
   Widget build(BuildContext context) {
     final border = OutlineInputBorder(
@@ -116,13 +103,7 @@ class _CurrencyConvertorMaterialPageState
 
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF2196F3), Color(0xFF7B1FA2)],
-          ),
-        ),
+        decoration: const BoxDecoration(gradient: AppGradient.mainGradient),
         child: SafeArea(
           child: Stack(
             children: [
@@ -136,8 +117,9 @@ class _CurrencyConvertorMaterialPageState
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
+                        const SizedBox(height: 20),
+
                         const Text(
                           'Currency Converter',
                           style: TextStyle(
@@ -151,6 +133,7 @@ class _CurrencyConvertorMaterialPageState
                           'check live rates and more',
                           style: TextStyle(color: Colors.white70),
                         ),
+
                         const SizedBox(height: 30),
                         Container(
                           padding: const EdgeInsets.all(16),
@@ -171,7 +154,6 @@ class _CurrencyConvertorMaterialPageState
                                   if (selected != null) {
                                     setState(() {
                                       fromCurrency = selected;
-                                      historicalRates.clear();
                                     });
                                   }
                                 },
@@ -179,6 +161,7 @@ class _CurrencyConvertorMaterialPageState
                               ),
 
                               const SizedBox(height: 12),
+
                               AnimatedRotation(
                                 turns: isSwapped ? 0.5 : 0,
                                 duration: const Duration(milliseconds: 400),
@@ -244,24 +227,53 @@ class _CurrencyConvertorMaterialPageState
 
                         const SizedBox(height: 30),
 
-                        Text(
-                          '${result.toStringAsFixed(2)} $toCurrency',
-                          style: const TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
+                        ValueListenableBuilder<LearningMode>(
+                          valueListenable: LearningModeController.currentMode,
+                          builder: (context, mode, _) {
+                            return Column(
+                              children: [
+                                // ✅ ALWAYS SHOW RESULT
+                                Text(
+                                  '${result.toStringAsFixed(2)} $toCurrency',
+                                  style: const TextStyle(
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
 
-                        TextButton(
-                          onPressed: result == 0 ? null : showCalculationHelp,
-                          child: const Text(
-                            'How is this calculated?',
-                            style: TextStyle(
-                              color: Colors.white,
-                              decoration: TextDecoration.underline,
-                            ),
-                          ),
+                                const SizedBox(height: 8),
+
+                                // 🎓 STUDENT & FINANCE: show formula button
+                                if (mode == LearningMode.student ||
+                                    mode == LearningMode.finance)
+                                  TextButton(
+                                    onPressed: showCalculationHelp,
+                                    child: const Text(
+                                      'How is this calculated?',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                    ),
+                                  ),
+
+                                // 📊 FINANCE ONLY: show insight text
+                                if (mode == LearningMode.finance)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 8),
+                                    child: Text(
+                                      'Insight: Exchange rates fluctuate due to market demand and global factors.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.white.withOpacity(0.85),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            );
+                          },
                         ),
 
                         const SizedBox(height: 120),
@@ -274,11 +286,13 @@ class _CurrencyConvertorMaterialPageState
                 left: 16,
                 bottom: 16,
                 child: GestureDetector(
-                  onTap: () async {
-                    setState(() => showTrendCard = !showTrendCard);
-                    if (historicalRates.isEmpty) {
-                      await loadHistoricalData();
-                    }
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const CurrencyTrendsPage(),
+                      ),
+                    );
                   },
                   child: Container(
                     padding: const EdgeInsets.all(12),
@@ -287,29 +301,6 @@ class _CurrencyConvertorMaterialPageState
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(Icons.show_chart, color: Colors.white),
-                  ),
-                ),
-              ),
-              AnimatedPositioned(
-                duration: const Duration(milliseconds: 300),
-                left: 16,
-                bottom: showTrendCard ? 80 : -240,
-                child: Material(
-                  elevation: 8,
-                  borderRadius: BorderRadius.circular(16),
-                  child: Container(
-                    width: 260,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: SizedBox(
-                      height: 120,
-                      child: isGraphLoading
-                          ? const Center(child: CircularProgressIndicator())
-                          : ExchangeRateGraph(rates: historicalRates),
-                    ),
                   ),
                 ),
               ),

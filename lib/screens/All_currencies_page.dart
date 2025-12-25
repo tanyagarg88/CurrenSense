@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import '../models/currency_model.dart';
 import '../utils/currency_flags.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import '../services/currency_api_service.dart';
 
 class AllCurrenciesPage extends StatefulWidget {
   const AllCurrenciesPage({super.key});
@@ -12,43 +10,36 @@ class AllCurrenciesPage extends StatefulWidget {
 }
 
 class _AllCurrenciesPageState extends State<AllCurrenciesPage> {
-  List<CurrencyModel> allCurrencies = [];
-  List<CurrencyModel> filtered = [];
-  bool isLoading = true;
+  final TextEditingController searchController = TextEditingController();
 
-  final TextEditingController searchCtrl = TextEditingController();
+  List<String> allCurrencies = [];
+  List<String> filteredCurrencies = [];
+
+  bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    fetchCurrencies();
+    loadCurrencies();
   }
 
-  Future<void> fetchCurrencies() async {
-    final res = await http.get(
-      Uri.parse('https://api.exchangerate-api.com/v4/latest/USD'),
-    );
-
-    if (res.statusCode == 200) {
-      final data = json.decode(res.body);
-      final rates = data['rates'] as Map<String, dynamic>;
-
-      final list = rates.keys.map((code) {
-        return CurrencyModel(code: code, name: code, flag: getFlag(code));
-      }).toList()..sort((a, b) => a.code.compareTo(b.code));
-
+  Future<void> loadCurrencies() async {
+    try {
+      final data = await CurrencyApiService.getAllCurrencies();
       setState(() {
-        allCurrencies = list;
-        filtered = list;
+        allCurrencies = data;
+        filteredCurrencies = data;
         isLoading = false;
       });
+    } catch (_) {
+      setState(() => isLoading = false);
     }
   }
 
-  void onSearch(String value) {
+  void filterCurrencies(String query) {
     setState(() {
-      filtered = allCurrencies
-          .where((c) => c.code.toLowerCase().contains(value.toLowerCase()))
+      filteredCurrencies = allCurrencies
+          .where((c) => c.toLowerCase().contains(query.toLowerCase()))
           .toList();
     });
   }
@@ -56,45 +47,102 @@ class _AllCurrenciesPageState extends State<AllCurrenciesPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('All Currencies')),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: TextField(
-              controller: searchCtrl,
-              onChanged: onSearch,
-              decoration: InputDecoration(
-                hintText: 'Search currency (USD, EUR...)',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF2196F3), Color(0xFF7B1FA2)],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'All Currencies',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ),
-          Expanded(
-            child: isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : ListView.builder(
-                    itemCount: filtered.length,
-                    itemBuilder: (_, i) {
-                      final c = filtered[i];
-                      return ListTile(
-                        leading: Text(
-                          c.flag,
-                          style: const TextStyle(fontSize: 26),
-                        ),
-                        title: Text(c.code),
-                        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                        onTap: () {
-                          Navigator.pop(context, c.code);
-                        },
-                      );
-                    },
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: TextField(
+                  controller: searchController,
+                  onChanged: filterCurrencies,
+                  decoration: InputDecoration(
+                    hintText: 'Search currency',
+                    prefixIcon: const Icon(Icons.search),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none,
+                    ),
                   ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+              Expanded(
+                child: isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(color: Colors.white),
+                      )
+                    : ListView.builder(
+                        itemCount: filteredCurrencies.length,
+                        itemBuilder: (context, index) {
+                          final currency = filteredCurrencies[index];
+                          return GestureDetector(
+                            onTap: () => Navigator.pop(context, currency),
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 6,
+                              ),
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.18),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    getFlag(currency),
+                                    style: const TextStyle(fontSize: 22),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    currency,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
